@@ -1,0 +1,36 @@
+# Environment variables (contains API keys)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Database
+ai.db
+*.sqlite3
+
+# Analytics
+analytics_store.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test_api_data.json
+test_apis.py
+swagger_test_data.md
+
+# Postman collection (contains URLs)
+*.postman_collection.json
