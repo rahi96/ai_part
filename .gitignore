@@ -1,36 +1,76 @@
-# Environment variables (contains API keys)
+# --- Secrets & Environment ---
 .env
+.env.local
+.env.*.local
+*.pem
+*.key
+certs/
 
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-venv/
 env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
 
-# Database
+# --- Database & Storage ---
 ai.db
 *.sqlite3
-
-# Analytics
+db.sqlite3
 analytics_store.json
+*.log
+storage/
 
-# IDE
+# --- IDEs & Editors ---
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
 
-# OS
+# --- OS Specific ---
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Test files
+# --- Testing & Documentation ---
 test_api_data.json
 test_apis.py
 swagger_test_data.md
+.ipynb_checkpoints/
 
-# Postman collection (contains URLs)
+# --- Tools ---
 *.postman_collection.json
+.dockerignore
+.docker-compose.override.yml
+
+*server.log
+*uvicorn.log

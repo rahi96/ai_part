@@ -6,7 +6,7 @@ import logging
 import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from ai.routes import analysis, wellness, analytics, chat
+from ai.routes import analysis, chat, documents, journey, medical_history
 from ai.config import settings
 
 # Configure logging
@@ -54,9 +54,10 @@ app.add_middleware(
 
 # Include routes
 app.include_router(analysis.router)
-app.include_router(wellness.router)
-app.include_router(analytics.router)
 app.include_router(chat.router)
+app.include_router(documents.router)
+app.include_router(journey.router)
+app.include_router(medical_history.router)
 
 
 @app.get("/")
@@ -68,9 +69,8 @@ async def root():
         "status": "active",
         "endpoints": {
             "health_analysis": "/api/ai/analyze",
-            "wellness": "/api/ai/wellness",
             "chat": "/api/ai/chat",
-            "analytics": "/api/ai/analytics",
+            "documents": "/api/ai/documents",
         }
     }
 

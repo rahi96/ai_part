@@ -1,7 +1,7 @@
 """
 Navelle AI Module — LangChain RAG Pipeline
-Embeds user queries, retrieves relevant medical context from Pinecone,
-and generates personalised GPT-4 responses.
+Generates personalised GPT-4 responses using health context and
+direct document chunks (no vector database).
 """
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ import logging
 from typing import Any
 
 from ai.config import settings
-from ai.utils.pinecone_client import pinecone_client
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +50,7 @@ def _build_health_context(health_data: dict) -> str:
     symptoms = health_data.get("symptoms", [])
     menstrual = health_data.get("menstrual_trackers", [])
     medical = health_data.get("medical_histories", [])
+    labs = health_data.get("lab_histories", [])
 
     lines = []
 
@@ -80,25 +80,35 @@ def _build_health_context(health_data: dict) -> str:
         conditions = ", ".join(m.get("condition", "?") for m in medical)
         lines.append(f"**Medical History:** {conditions}")
 
+    if labs:
+        most_recent = labs[0]  # Assume sorted by date, newest first
+        lab_notes = most_recent.get("notes", "")
+        lab_date = most_recent.get("date", "")
+        lines.append(f"**Recent Lab Results ({lab_date}):** {lab_notes}")
+        if most_recent.get("file_url"):
+            lines.append(f"Lab document: {most_recent['file_url']}")
+
     return "\n".join(lines) if lines else "Minimal health data available."
 
 
 def _build_rag_context(retrieved_docs: list[dict]) -> str:
-    """Format retrieved Pinecone documents as a context block."""
+    """Format retrieved documents as a context block."""
     if not retrieved_docs:
         return ""
 
-    lines = ["**Relevant Medical Knowledge:**"]
+    lines = ["**Relevant Documents:**"]
     for i, doc in enumerate(retrieved_docs, 1):
-        lines.append(f"\n[Source {i}: {doc['topic']}]\n{doc['content']}")
+        title = doc.get("topic") or doc.get("document_title", "Untitled")
+        content = doc.get("content") or doc.get("content_preview", "")
+        lines.append(f"\n[Source {i}: {title}]\n{content}")
 
     return "\n".join(lines)
 
 
 class RAGPipeline:
     """
-    Retrieval-Augmented Generation pipeline using Pinecone + GPT-4.
-    Falls back gracefully if OpenAI or Pinecone is unavailable.
+    Retrieval-Augmented Generation pipeline using GPT-4.
+    Falls back gracefully if OpenAI is unavailable.
     """
 
     def __init__(self) -> None:
@@ -206,7 +216,7 @@ class RAGPipeline:
     ) -> dict:
         """
         Generate response using LLM general knowledge when RAG fails.
-        This provides helpful answers even without Pinecone context.
+        This provides helpful answers even without retrieved documents.
         """
         if not self._init_client():
             # Only return error if OpenAI itself is unavailable

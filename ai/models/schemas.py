@@ -168,3 +168,82 @@ class ErrorResponse(BaseModel):
     """Standard error response"""
     detail: str
     error_code: Optional[str] = None
+
+
+# ==================== Journey - Health Goals ====================
+
+class GoalProgressItem(BaseModel):
+    """Individual health goal progress"""
+    title: str
+    target_description: str
+    current_value: float
+    target_value: float
+    progress_percentage: float  # 0-100
+
+
+class HealthGoalCreateRequest(BaseModel):
+    """Request to create a health goal"""
+    goal_title: str
+    measurement: str  # e.g., "kg", "hours", "steps"
+    current_value: float
+    target_value: float
+    notes: Optional[str] = None
+
+
+class JourneyPlanResponse(BaseModel):
+    """Response for journey plan generation"""
+    plan_title: str = "EMPOWER YOUR PERIMENOPAUSE JOURNEY"
+    username: str
+    created_at: str
+    welcome_message: str
+    why_plan_description: str
+    goals: List[GoalProgressItem]
+    recommended_actions: List[str]
+    next_review_date: str
+
+
+# ==================== Medical History Analysis ====================
+
+class MedicalHistoryEntry(BaseModel):
+    """Single medical history entry"""
+    condition_name: str
+    category: str  # e.g., "Hormonal", "Metabolic", "Mental Health"
+    start: Optional[str] = None
+    date_diagnosed: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MedicalHistoryAnalysisRequest(BaseModel):
+    """Request to analyze medical history"""
+    medical_history: MedicalHistoryEntry
+
+
+class RelatedCondition(BaseModel):
+    """Related condition with overlap info"""
+    name: str
+    match_percentage: int  # 0-100
+    severity: str  # low, medium, high
+    color: str
+    shared_symptoms: List[str]
+
+
+class SymptomOverlap(BaseModel):
+    """Symptom overlap percentages"""
+    Hormonal: int = 0
+    Mental: int = 0
+    Metabolic: int = 0
+    Fatigue: int = 0
+    Immune: int = 0
+
+
+class MedicalHistoryAnalysisDetail(BaseModel):
+    """Detailed analysis result"""
+    title: str
+    description: str
+    symptom_overlap: SymptomOverlap
+    conditions: List[RelatedCondition]
+
+
+class MedicalHistoryAnalysisResponse(BaseModel):
+    """Response for medical history analysis"""
+    analysis: MedicalHistoryAnalysisDetail

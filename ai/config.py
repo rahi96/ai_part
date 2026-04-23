@@ -3,10 +3,16 @@ Navelle AI Module — Configuration
 Loads all environment variables via pydantic-settings.
 """
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # ── App ──────────────────────────────────────────────────────────────────
     app_name: str = "Navelle AI Module"
     debug: bool = False
@@ -20,18 +26,8 @@ class Settings(BaseSettings):
     customer_token: str = ""
     admin_token: str = ""
 
-    # ── Pinecone ─────────────────────────────────────────────────────────────
-    pinecone_api_key: str = ""
-    pinecone_index_name: str = "navelle-medical-docs"
-    pinecone_environment: str = "us-east-1"
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
-
     @property
-    def APP_NAME(self) -> str: 
+    def APP_NAME(self) -> str:
         return self.app_name
 
 

@@ -176,52 +176,52 @@ class BackendClient:
     async def get_user_files(self, user_id: str) -> list[dict]:
         """
         Fetch user's uploaded files from the backend.
-        Returns files collection with Cloudinary URLs.
 
-        Expected response format:
-        [
-            {
-                "_id": "...",
-                "url": "https://res.cloudinary.com/...",
-                "name": "Laboratory_Test_Report.pdf",
-                "type": "DOC",
-                "createdAt": "...",
-                "postId": "..."
-            }
-        ]
+        The backend stores Cloudinary URLs inside lab_histories and
+        medical_histories under the 'file_url' key, not a top-level
+        'files' array. This method extracts and normalises them.
         """
-        # Try different possible endpoints
-        endpoints_to_try = [
-            f"/api/users/{user_id}/files",
-            f"/api/customers/{user_id}/files",
-            f"/api/files/user/{user_id}",
-        ]
+        try:
+            data = await self.get_user_health_overview(user_id, days=365)
+            files: list[dict] = []
 
-        for path in endpoints_to_try:
-            try:
-                logger.info("Trying endpoint: %s", path)
-                data = await self._get(path)
+            # lab_histories contain file_url
+            for lab in data.get("lab_histories", []):
+                url = lab.get("file_url")
+                if url:
+                    files.append(
+                        {
+                            "url": url,
+                            "name": f"Lab_Report_{lab.get('date', 'unknown')}.pdf",
+                            "_id": str(lab.get("_id", lab.get("id", "unknown"))),
+                            "type": "LAB",
+                        }
+                    )
 
-                # Log raw response for debugging
-                logger.info("Response from %s: %s", path, type(data))
+            # medical_histories may also contain file_url
+            for med in data.get("medical_histories", []):
+                url = med.get("file_url")
+                if url:
+                    files.append(
+                        {
+                            "url": url,
+                            "name": f"Medical_Report_{med.get('date_diagnosed', 'unknown')}.pdf",
+                            "_id": str(med.get("_id", med.get("id", "unknown"))),
+                            "type": "DOC",
+                        }
+                    )
 
-                if isinstance(data, list):
-                    logger.info("Found %d files from %s", len(data), path)
-                    return data
-                elif isinstance(data, dict):
-                    files = data.get("files", [])
-                    logger.info("Found %d files from %s (in 'files' key)", len(files), path)
-                    return files
+            # Also check legacy top-level files key just in case
+            for f in data.get("files", []):
+                if f.get("url") or f.get("secure_url"):
+                    files.append(f)
 
-            except BackendAuthError:
-                logger.warning("Auth error for %s", path)
-                continue
-            except BackendClientError as exc:
-                logger.warning("Error for %s: %s", path, exc)
-                continue
+            logger.info("Found %d files for user %s via health-overview", len(files), user_id)
+            return files
 
-        logger.error("All endpoints failed for user %s", user_id)
-        return []
+        except Exception as exc:
+            logger.error("Failed to fetch files for user %s: %s", user_id, exc)
+            return []
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -235,6 +235,7 @@ def _empty_health_data(user_id: str) -> dict:
         "medical_histories": [],
         "lab_histories": [],
         "chat_messages": [],
+        "files": [],
     }
 
 
