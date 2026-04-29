@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     customer_token: str = ""
     admin_token: str = ""
 
+    # ── MongoDB ──────────────────────────────────────────────────────────────
+    mongodb_uri: str = ""
+
     @property
     def APP_NAME(self) -> str:
         return self.app_name

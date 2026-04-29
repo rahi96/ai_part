@@ -9,6 +9,7 @@ import logging
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from ai.utils.backend_client import backend_client
+from ai.utils.mongodb_client import clear_thread_messages, get_thread_messages
 from ai.workflows.chat_workflow import run_chat_workflow
 from ai.services.document_service import DocumentService
 
@@ -65,26 +66,21 @@ async def chat_message(
 
 @router.get("/thread/{thread_id}/history")
 async def get_thread_history(thread_id: str):
-
-    from ai.workflows.chat_workflow import _thread_store
-    thread = _thread_store.get(thread_id)
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found or expired.")
+    messages = await get_thread_messages(thread_id)
+    if not messages:
+        raise HTTPException(status_code=404, detail="Thread not found or empty.")
     return {
         "thread_id": thread_id,
-        "created_at": thread["created_at"].isoformat(),
-        "message_count": len(thread["history"]),
-        "history": thread["history"],
+        "message_count": len(messages),
+        "history": messages,
     }
 
 
 @router.delete("/thread/{thread_id}")
 async def clear_thread(thread_id: str):
-
-    from ai.workflows.chat_workflow import _thread_store
-    if thread_id in _thread_store:
-        del _thread_store[thread_id]
-        return {"message": "Thread cleared successfully.", "thread_id": thread_id}
+    deleted = await clear_thread_messages(thread_id)
+    if deleted > 0:
+        return {"message": "Thread cleared successfully.", "thread_id": thread_id, "deleted_count": deleted}
     raise HTTPException(status_code=404, detail="Thread not found.")
 
 

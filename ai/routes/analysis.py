@@ -32,7 +32,7 @@ async def _get_health_data(user_id: str, days: int = 30) -> dict:
         )
 
 
-@router.get("/wellness-dashboard/{user_id}")
+@router.post("/wellness-dashboard/{user_id}")
 async def wellness_dashboard(
     user_id: str,
     days: int = Query(30, ge=1, le=365, description="Lookback window in days"),
@@ -41,7 +41,7 @@ async def wellness_dashboard(
     return _service.get_wellness_dashboard(user_id, health_data)
 
 
-@router.get("/symptom-intensity-trend/{user_id}")
+@router.post("/symptom-intensity-trend/{user_id}")
 async def symptom_intensity_trend(
     user_id: str,
     days: int = Query(7, ge=1, le=30, description="Number of days to trend"),
@@ -50,7 +50,7 @@ async def symptom_intensity_trend(
     return _service.generate_symptom_intensity_trend(user_id, health_data, days=days)
 
 
-@router.get("/trigger-warnings/{user_id}")
+@router.post("/trigger-warnings/{user_id}")
 async def trigger_warnings(
     user_id: str,
     days: int = Query(30, ge=1, le=365),
@@ -63,7 +63,7 @@ async def trigger_warnings(
     }
 
 
-@router.get("/top-symptom-analysis/{user_id}")
+@router.post("/top-symptom-analysis/{user_id}")
 async def top_symptom_analysis(
     user_id: str,
     days: int = Query(30, ge=1, le=365),
@@ -76,7 +76,7 @@ async def top_symptom_analysis(
     }
 
 
-@router.get("/humor-break/{user_id}")
+@router.post("/humor-break/{user_id}")
 async def humor_break(user_id: str):
     health_data = await _get_health_data(user_id, days=30)
     return _service.generate_humor_break(user_id, health_data)

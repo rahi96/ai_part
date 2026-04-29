@@ -72,5 +72,3 @@ swagger_test_data.md
 .dockerignore
 .docker-compose.override.yml
 
-*server.log
-*uvicorn.log

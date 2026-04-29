@@ -1,20 +1,11 @@
-"""
-Navelle AI Module — Document Ingestion Routes
-Fetches user files from Cloudinary, extracts text, and returns chunks.
-No vector database — chunks are returned for direct prompt use.
-"""
 from __future__ import annotations
-
 import logging
-
 from fastapi import APIRouter, HTTPException, Path
-
 from ai.services.document_service import DocumentService
 from ai.utils.backend_client import backend_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai/documents", tags=["Documents"])
-
 _service = DocumentService()
 
 
@@ -22,10 +13,6 @@ _service = DocumentService()
 async def ingest_user_documents(
     user_id: str = Path(..., description="MongoDB ObjectId of the user"),
 ):
-    """
-    Fetch all user files from the backend (Cloudinary URLs), extract text,
-    and return text chunks for direct use in prompts.
-    """
     try:
         result = await _service.ingest_user_documents(user_id)
         return {

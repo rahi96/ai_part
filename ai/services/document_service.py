@@ -1,14 +1,6 @@
-"""
-Navelle AI Module — Document Ingestion Service
-Fetches user files from the backend (Cloudinary URLs),
-processes them into text chunks, and returns them for direct use.
-No vector database — chunks are returned for direct prompt injection.
-"""
 from __future__ import annotations
-
 import logging
 from typing import Any
-
 from ai.utils.backend_client import backend_client
 from ai.utils.document_processor import process_cloudinary_file
 
@@ -16,25 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentService:
-    """
-    Service for fetching and processing user-uploaded documents into text chunks.
-    """
-
     async def ingest_user_documents(self, user_id: str) -> dict:
-        """
-        Fetch all user files from the backend, extract text, and chunk.
-
-        Returns:
-            {
-                "user_id": str,
-                "files_found": int,
-                "files_processed": int,
-                "chunks": list[dict],
-                "errors": list[str],
-            }
-        """
         logger.info("Starting document ingestion for user %s", user_id)
-
         files = await backend_client.get_user_files(user_id)
         logger.info("Raw files from backend for user %s: %s", user_id, files)
 

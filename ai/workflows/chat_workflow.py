@@ -11,55 +11,32 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
 from ai.utils.langchain_rag import DISCLAIMER, intent_classifier, rag_pipeline
+from ai.utils.mongodb_client import get_thread_messages, insert_chat_message
 
 logger = logging.getLogger(__name__)
 
-# ── Thread store (in-memory, 30-day TTL) ──────────────────────────────────────
-# { thread_id: { "created_at": datetime, "history": list[dict] } }
-_thread_store: dict[str, dict] = {}
-THREAD_TTL_DAYS = 30
 
-
-def _get_or_create_thread(thread_id: str | None) -> tuple[str, list[dict], bool]:
+async def _get_or_create_thread(thread_id: str | None) -> tuple[str, list[dict], bool]:
     """
     Return (thread_id, conversation_history, is_new).
-    Cleans up expired threads on every call.
+    Fetches history from MongoDB; creates a new thread if not found.
     """
-    _cleanup_expired_threads()
-
-    if thread_id and thread_id in _thread_store:
-        entry = _thread_store[thread_id]
-        return thread_id, entry["history"], False
+    if thread_id:
+        history = await get_thread_messages(thread_id)
+        if history:
+            # Convert MongoDB docs to conversation_history format
+            convo = [{"role": m["role"], "content": m["message"]} for m in history]
+            return thread_id, convo, False
 
     # Create new thread
     new_id = thread_id or str(uuid.uuid4())
-    _thread_store[new_id] = {
-        "created_at": datetime.now(timezone.utc),
-        "history": [],
-    }
     return new_id, [], True
-
-
-def _cleanup_expired_threads() -> None:
-    cutoff = datetime.now(timezone.utc) - timedelta(days=THREAD_TTL_DAYS)
-    expired = [tid for tid, data in _thread_store.items() if data["created_at"] < cutoff]
-    for tid in expired:
-        del _thread_store[tid]
-    if expired:
-        logger.info("Cleaned up %d expired threads", len(expired))
-
-
-def _append_to_thread(thread_id: str, role: str, content: str) -> None:
-    if thread_id in _thread_store:
-        _thread_store[thread_id]["history"].append({"role": role, "content": content})
-        # Keep last 20 turns
-        _thread_store[thread_id]["history"] = _thread_store[thread_id]["history"][-20:]
 
 
 # ── LangGraph State ────────────────────────────────────────────────────────────
@@ -129,15 +106,7 @@ def node_inject_disclaimer(state: ChatState) -> ChatState:
 # ── Node 4: Thread Expiry Check ────────────────────────────────────────────────
 
 def node_check_thread(state: ChatState) -> ChatState:
-    """Update conversation history and check thread health."""
-    thread_id = state["thread_id"]
-    message = state["message"]
-    response = state["response"]
-
-    # Append this turn to thread history
-    _append_to_thread(thread_id, "user", message)
-    _append_to_thread(thread_id, "assistant", response)
-
+    """Pass-through node; MongoDB persistence handled in run_chat_workflow."""
     return state
 
 
@@ -222,6 +191,26 @@ async def run_chat_workflow(
             "response_source": "error",
             "is_new_thread": is_new,
         }
+
+    # Persist user message and assistant response to MongoDB
+    try:
+        await insert_chat_message(
+            customer_id=user_id,
+            thread_id=resolved_thread_id,
+            role="user",
+            message=message,
+        )
+        await insert_chat_message(
+            customer_id=user_id,
+            thread_id=resolved_thread_id,
+            role="assistant",
+            message=final_state["response"],
+            confidence_score=final_state.get("confidence"),
+            intent=final_state.get("intent"),
+            sources=[d.get("document_title", d.get("topic", "unknown")) for d in final_state.get("retrieved_docs", [])],
+        )
+    except Exception as exc:
+        logger.warning("Failed to persist chat messages to MongoDB: %s", exc)
 
     return {
         "response": final_state["response"],
