@@ -92,6 +92,26 @@ async def get_thread_messages(thread_id: str) -> list[dict]:
     return messages
 
 
+async def get_recent_global_messages(limit: int = 100) -> list[dict]:
+    """Retrieve recent messages globally across all users."""
+    db = await get_db()
+    cursor = (
+        db["chat_messages"]
+        .find({"role": "user"})
+        .sort("createdAt", -1)
+        .limit(limit)
+    )
+    messages = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        doc["createdAt"] = doc["createdAt"].isoformat() if "createdAt" in doc else None
+        doc["updatedAt"] = doc["updatedAt"].isoformat() if "updatedAt" in doc else None
+        messages.append(doc)
+    # Reverse to keep chronological order for LLM context if needed, or keep descending. 
+    # Descending is fine for "recent queries".
+    return messages
+
+
 async def clear_thread_messages(thread_id: str) -> int:
     """Delete all messages for a given thread. Returns number of deleted documents."""
     db = await get_db()

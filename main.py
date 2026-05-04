@@ -11,10 +11,15 @@ from ai.config import settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Set specific loggers to DEBUG for troubleshooting
+logging.getLogger("ai.services").setLevel(logging.DEBUG)
+logging.getLogger("ai.utils").setLevel(logging.DEBUG)
+logging.getLogger("ai.routes").setLevel(logging.DEBUG)
 
 # Create FastAPI app
 app = FastAPI(

@@ -142,6 +142,16 @@ class RecentQueriesResponse(BaseModel):
         from_attributes = True
 
 
+# 3. Chat Insights Combined Response
+class ChatInsightsResponse(BaseModel):
+    """Combined response for Mennie AI Logic dashboard"""
+    most_used: MostUsedQuestionsResponse
+    recent_queries: RecentQueriesResponse
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Chatbot - Page 4 ====================
 
 # 1. Chat Message
@@ -227,20 +237,16 @@ class RelatedCondition(BaseModel):
     shared_symptoms: List[str]
 
 
-class SymptomOverlap(BaseModel):
-    """Symptom overlap percentages"""
-    Hormonal: int = 0
-    Mental: int = 0
-    Metabolic: int = 0
-    Fatigue: int = 0
-    Immune: int = 0
+# SymptomOverlap is intentionally a plain dict so the LLM-generated
+# dynamic category key (e.g. "Hormonal", "PCOS", etc.) is preserved.
+SymptomOverlap = Dict[str, int]
 
 
 class MedicalHistoryAnalysisDetail(BaseModel):
     """Detailed analysis result"""
     title: str
     description: str
-    symptom_overlap: SymptomOverlap
+    symptom_overlap: Dict[str, int]   # dynamic keys — varies by condition
     conditions: List[RelatedCondition]
 
 

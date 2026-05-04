@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from ai.config import settings
+from ai.utils.llm_call import llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -107,31 +108,10 @@ def _build_rag_context(retrieved_docs: list[dict]) -> str:
 
 class RAGPipeline:
     """
-    Retrieval-Augmented Generation pipeline using GPT-4.
-    Falls back gracefully if OpenAI is unavailable.
+    Retrieval-Augmented Generation pipeline using AWS Bedrock Claude.
     """
 
-    def __init__(self) -> None:
-        self._client = None
-        self._ready = False
-
-    def _init_client(self) -> bool:
-        if self._ready:
-            return True
-        if not settings.openai_api_key:
-            logger.warning("OpenAI API key not configured — RAG unavailable")
-            return False
-        try:
-            from openai import OpenAI
-            self._client = OpenAI(api_key=settings.openai_api_key)
-            self._ready = True
-            logger.info("RAG pipeline initialised with model: %s", settings.openai_model)
-            return True
-        except Exception as exc:
-            logger.error("Failed to initialise OpenAI client: %s", exc)
-            return False
-
-    def generate(
+    async def generate(
         self,
         user_message: str,
         health_data: dict | None = None,
@@ -150,8 +130,6 @@ class RAGPipeline:
                 "fallback_used": bool
             }
         """
-        if not self._init_client():
-            return self._fallback_response(user_message)
 
         health_ctx = _build_health_context(health_data or {})
         rag_ctx = _build_rag_context(retrieved_docs or [])
@@ -177,14 +155,13 @@ class RAGPipeline:
         messages.append({"role": "user", "content": "\n".join(user_content_parts)})
 
         try:
-            response = self._client.chat.completions.create(
-                model=settings.openai_model,
+            answer = await llm_call.chat_completion(
                 messages=messages,
                 max_tokens=800,
                 temperature=0.7,
             )
-
-            answer = response.choices[0].message.content or ""
+            if not answer:
+                answer = ""
             sources = [doc["topic"] for doc in (retrieved_docs or [])]
 
             # Estimate confidence from retrieval scores
@@ -197,18 +174,18 @@ class RAGPipeline:
             return {
                 "response": answer + DISCLAIMER,
                 "sources": sources,
-                "model": settings.openai_model,
+                "model": "bedrock",
                 "confidence": confidence,
                 "fallback_used": False,
             }
 
         except Exception as exc:
-            logger.error("GPT-4 generation failed: %s", exc)
-            return self._generate_general_knowledge_response(
+            logger.error("Bedrock generation failed: %s", exc)
+            return await self._generate_general_knowledge_response(
                 user_message, health_data, conversation_history
             )
 
-    def _generate_general_knowledge_response(
+    async def _generate_general_knowledge_response(
         self,
         user_message: str,
         health_data: dict | None = None,
@@ -218,19 +195,6 @@ class RAGPipeline:
         Generate response using LLM general knowledge when RAG fails.
         This provides helpful answers even without retrieved documents.
         """
-        if not self._init_client():
-            # Only return error if OpenAI itself is unavailable
-            return {
-                "response": (
-                    "I'm having trouble connecting to my knowledge base right now. "
-                    "Please try again in a moment, or contact your healthcare provider "
-                    "directly for immediate support." + DISCLAIMER
-                ),
-                "sources": [],
-                "model": "fallback",
-                "confidence": 0.0,
-                "fallback_used": True,
-            }
 
         health_ctx = _build_health_context(health_data or {})
 
@@ -270,19 +234,18 @@ You MUST NOT:
         messages.append({"role": "user", "content": "\n".join(user_content_parts)})
 
         try:
-            response = self._client.chat.completions.create(
-                model=settings.openai_model,
+            answer = await llm_call.chat_completion(
                 messages=messages,
                 max_tokens=800,
                 temperature=0.7,
             )
-
-            answer = response.choices[0].message.content or ""
+            if not answer:
+                answer = ""
 
             return {
                 "response": answer + DISCLAIMER,
                 "sources": [],  # No RAG sources when using general knowledge
-                "model": settings.openai_model,
+                "model": "bedrock",
                 "confidence": 0.7,  # Good confidence for general knowledge
                 "fallback_used": False,  # This is not a fallback - it's general knowledge mode
             }
@@ -302,7 +265,7 @@ You MUST NOT:
                 "fallback_used": True,
             }
 
-    def _fallback_response(
+    async def _fallback_response(
         self,
         user_message: str,
         health_data: dict | None = None,
@@ -310,7 +273,7 @@ You MUST NOT:
     ) -> dict:
         """Legacy fallback - redirects to general knowledge mode."""
         logger.info("RAG failed - using general knowledge mode instead of template fallback")
-        return self._generate_general_knowledge_response(
+        return await self._generate_general_knowledge_response(
             user_message, health_data, conversation_history
         )
 

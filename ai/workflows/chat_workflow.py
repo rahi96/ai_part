@@ -68,7 +68,7 @@ def node_classify_intent(state: ChatState) -> ChatState:
 
 # ── Node 2: Generate Response ──────────────────────────────────────────────────
 
-def node_generate_response(state: ChatState) -> ChatState:
+async def node_generate_response(state: ChatState) -> ChatState:
     """Generate AI response using rag_pipeline for all intents."""
     intent = state["intent"]
     message = state["message"]
@@ -76,7 +76,7 @@ def node_generate_response(state: ChatState) -> ChatState:
     history = state.get("conversation_history", [])
     retrieved_docs = state.get("retrieved_docs", [])
 
-    result = rag_pipeline.generate(
+    result = await rag_pipeline.generate(
         user_message=message,
         health_data=health_data,
         retrieved_docs=retrieved_docs,
@@ -156,7 +156,7 @@ async def run_chat_workflow(
         }
     """
     # Resolve thread
-    resolved_thread_id, history, is_new = _get_or_create_thread(thread_id)
+    resolved_thread_id, history, is_new = await _get_or_create_thread(thread_id)
 
     initial_state: ChatState = {
         "user_id": user_id,

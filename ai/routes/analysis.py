@@ -1,8 +1,9 @@
 from __future__ import annotations
 import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from ai.services.analysis_service import AnalysisService
 from ai.utils.backend_client import BackendClientError, backend_client
+from ai.models.schemas import ChatInsightsResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai/analyze", tags=["Analysis"])
@@ -38,7 +39,7 @@ async def wellness_dashboard(
     days: int = Query(30, ge=1, le=365, description="Lookback window in days"),
 ) -> dict:
     health_data = await _get_health_data(user_id, days=days)
-    return _service.get_wellness_dashboard(user_id, health_data)
+    return await _service.get_wellness_dashboard(user_id, health_data)
 
 
 @router.post("/symptom-intensity-trend/{user_id}")
@@ -47,7 +48,7 @@ async def symptom_intensity_trend(
     days: int = Query(7, ge=1, le=30, description="Number of days to trend"),
 ) -> list[dict]:
     health_data = await _get_health_data(user_id, days=days)
-    return _service.generate_symptom_intensity_trend(user_id, health_data, days=days)
+    return await _service.generate_symptom_intensity_trend(user_id, health_data, days=days)
 
 
 @router.post("/trigger-warnings/{user_id}")
@@ -56,7 +57,7 @@ async def trigger_warnings(
     days: int = Query(30, ge=1, le=365),
 ) -> dict:
     health_data = await _get_health_data(user_id, days=days)
-    tip = _service.generate_trigger_tip(user_id, health_data)
+    tip = await _service.generate_trigger_tip(user_id, health_data)
     return {
         "user_id": user_id,
         "tip": tip,
@@ -69,7 +70,7 @@ async def top_symptom_analysis(
     days: int = Query(30, ge=1, le=365),
 ) -> dict:
     health_data = await _get_health_data(user_id, days=days)
-    top_symptoms = _service.generate_top_symptom_analysis(user_id, health_data)
+    top_symptoms = await _service.generate_top_symptom_analysis(user_id, health_data)
     return {
         "user_id": user_id,
         "top_symptoms": top_symptoms,
@@ -79,7 +80,7 @@ async def top_symptom_analysis(
 @router.post("/humor-break/{user_id}")
 async def humor_break(user_id: str):
     health_data = await _get_health_data(user_id, days=30)
-    return _service.generate_humor_break(user_id, health_data)
+    return await _service.generate_humor_break(user_id, health_data)
 
 
 @router.get("/health-overview/{user_id}")
@@ -109,3 +110,17 @@ async def health_overview(
         "included_fields": list(filtered_data.keys()),
         "data": filtered_data,
     }
+
+
+@router.post("/chat-insights", response_model=ChatInsightsResponse)
+async def chat_insights() -> dict:
+    """
+    Fetch global chat history across all users, then use AI to synthesize
+    dashboard data for Most Used Questions and Recent Queries.
+    """
+    try:
+        insights = await _service.generate_chat_insights()
+        return insights
+    except Exception as exc:
+        logger.error("Failed to generate chat insights: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to generate chat insights")

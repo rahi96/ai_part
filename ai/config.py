@@ -17,9 +17,11 @@ class Settings(BaseSettings):
     app_name: str = "Navelle AI Module"
     debug: bool = False
 
-    # ── OpenAI ───────────────────────────────────────────────────────────────
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4"
+    # ── AWS Bedrock ──────────────────────────────────────────────────────────────
+    bedrock_model_id: str = "meta.llama3-70b-instruct-v1:0"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "us-east-1"
 
     # ── Backend API ──────────────────────────────────────────────────────────
     backend_url: str = "http://13.51.155.66:8989"
