@@ -147,7 +147,7 @@ class ChatInsightsResponse(BaseModel):
     """Combined response for Mennie AI Logic dashboard"""
     most_used: MostUsedQuestionsResponse
     recent_queries: RecentQueriesResponse
-    
+
     class Config:
         from_attributes = True
 

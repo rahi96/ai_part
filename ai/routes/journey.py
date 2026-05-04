@@ -25,13 +25,13 @@ async def create_journey_plan(
     
     This endpoint fetches the user's latest health overview (including lab histories)
     from the backend and uses AWS Bedrock Claude to generate a tailored wellness journey.
-    
+
     The AI analyzes:
     - User's health goal and measurements
     - Current and target values
     - Recent lab reports and medical documents
     - Clinical context and perimenopause symptoms
-    
+
     Returns a comprehensive journey plan with personalized recommendations.
     """
     return await _service.create_journey_plan(user_id, request)
