@@ -195,11 +195,11 @@ class AnalysisService:
             val = float(scores[i]) if isinstance(scores[i], (int, float, str)) else real_trend[i]["intensity"]
             result.append({"intensity": round(max(0.0, min(10.0, val)), 1)})
 
-        # Pad if AI returned fewer values
-        while len(result) < len(real_trend):
-            result.append({"intensity": real_trend[len(result)]["intensity"]})
+        # Ensure the result always has exactly 'days' elements for charting
+        while len(result) < days:
+            result.insert(0, {"intensity": 0.0}) # Pad beginning with 0.0 if missing days
 
-        return result
+        return result[-days:]
 
     # ── Top Symptoms ───────────────────────────────────────────────────────────
 
