@@ -23,6 +23,7 @@ docker build -t navelle-ai:latest .
 docker run -p 8000:8000 \
   --env-file .env \
   -e OPENAI_API_KEY=your_key \
+  -e PINECONE_API_KEY=your_key \
   navelle-ai:latest
 ```
 
@@ -95,6 +96,7 @@ nano .env
 
 # Add your keys:
 # OPENAI_API_KEY
+# PINECONE_API_KEY
 # CUSTOMER_TOKEN
 # ADMIN_TOKEN
 ```

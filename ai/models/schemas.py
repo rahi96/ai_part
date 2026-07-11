@@ -142,16 +142,6 @@ class RecentQueriesResponse(BaseModel):
         from_attributes = True
 
 
-# 3. Chat Insights Combined Response
-class ChatInsightsResponse(BaseModel):
-    """Combined response for Mennie AI Logic dashboard"""
-    most_used: MostUsedQuestionsResponse
-    recent_queries: RecentQueriesResponse
-
-    class Config:
-        from_attributes = True
-
-
 # ==================== Chatbot - Page 4 ====================
 
 # 1. Chat Message
@@ -172,18 +162,22 @@ class ChatMessageResponse(BaseModel):
         from_attributes = True
 
 
-# ==================== Common Models ====================
+# ==================== Health Journey - New Section ====================
 
-class ErrorResponse(BaseModel):
-    """Standard error response"""
-    detail: str
-    error_code: Optional[str] = None
+# 1. Health Goal Creation
+class HealthGoalCreateRequest(BaseModel):
+    """Request to create a new health goal (Image 1)"""
+    goal_title: str  # e.g., "Reduce hot flashes frequency"
+    measurement: str  # e.g., "Wellbeing"
+    current_value: float  # e.g., 5
+    target_value: float  # e.g., 2
+    start_date: str  # e.g., "2026-04-20"
+    target_date: Optional[str] = None
+    notes: Optional[str] = None
 
-
-# ==================== Journey - Health Goals ====================
 
 class GoalProgressItem(BaseModel):
-    """Individual health goal progress"""
+    """Goal progress for the plan view (Image 2)"""
     title: str
     target_description: str
     current_value: float
@@ -191,65 +185,85 @@ class GoalProgressItem(BaseModel):
     progress_percentage: float  # 0-100
 
 
-class HealthGoalCreateRequest(BaseModel):
-    """Request to create a health goal"""
-    goal_title: str
-    measurement: str  # e.g., "kg", "hours", "steps"
-    current_value: float
-    target_value: float
-    notes: Optional[str] = None
-
-
 class JourneyPlanResponse(BaseModel):
-    """Response for journey plan generation"""
+    """Response for the perimenopause journey plan (Image 2)"""
     plan_title: str = "EMPOWER YOUR PERIMENOPAUSE JOURNEY"
     username: str
-    created_at: str
+    created_at: str  # "February 19th, 2026"
     welcome_message: str
+    why_plan_title: str = "WHY THIS PLAN"
     why_plan_description: str
     goals: List[GoalProgressItem]
     recommended_actions: List[str]
-    next_review_date: str
+    next_review_date: str  # "MARCH 5TH, 2026"
+
+    class Config:
+        from_attributes = True
 
 
 # ==================== Medical History Analysis ====================
 
-class MedicalHistoryEntry(BaseModel):
+# Medical History Input
+class MedicalHistoryInput(BaseModel):
     """Single medical history entry"""
     condition_name: str
-    category: str  # e.g., "Hormonal", "Metabolic", "Mental Health"
-    start: Optional[str] = None
-    date_diagnosed: Optional[str] = None
-    notes: Optional[str] = None
+    start: str  # YYYY-MM format
+    category: str
+    date_diagnosed: str  # YYYY-MM-DD format
+    notes: str
 
 
 class MedicalHistoryAnalysisRequest(BaseModel):
-    """Request to analyze medical history"""
-    medical_history: MedicalHistoryEntry
+    """Request for medical history analysis"""
+    medical_history: MedicalHistoryInput
 
 
+# Symptom Overlap Response
+class SymptomOverlapData(BaseModel):
+    """Symptom overlap percentages"""
+    Hormonal: Optional[int] = None
+    Mental: Optional[int] = None
+    PCOS: Optional[int] = None
+    Metabolic: Optional[int] = None
+    Fatigue: Optional[int] = None
+    Immune: Optional[int] = None
+    
+    class Config:
+        extra = "allow"  # Allow additional fields
+
+
+# Related Condition
 class RelatedCondition(BaseModel):
-    """Related condition with overlap info"""
+    """Individual related condition with analysis"""
     name: str
     match_percentage: int  # 0-100
-    severity: str  # low, medium, high
-    color: str
-    shared_symptoms: List[str]
+    severity: str  # "low", "medium", "high"
+    color: str  # Color code for UI (e.g., "red", "orange")
+    shared_symptoms: Optional[List[str]] = None
 
 
-# SymptomOverlap is intentionally a plain dict so the LLM-generated
-# dynamic category key (e.g. "Hormonal", "PCOS", etc.) is preserved.
-SymptomOverlap = Dict[str, int]
-
-
-class MedicalHistoryAnalysisDetail(BaseModel):
-    """Detailed analysis result"""
-    title: str
-    description: str
-    symptom_overlap: Dict[str, int]   # dynamic keys — varies by condition
-    conditions: List[RelatedCondition]
-
-
+# Medical History Analysis Response
 class MedicalHistoryAnalysisResponse(BaseModel):
-    """Response for medical history analysis"""
-    analysis: MedicalHistoryAnalysisDetail
+    """Response with AI-generated medical history analysis"""
+    
+    class Analysis(BaseModel):
+        title: str  # e.g., "Conditions That Matter, Menopause"
+        description: str  # Explanation of symptom overlap
+        symptom_overlap: SymptomOverlapData  # Percentages for each category
+        conditions: List[RelatedCondition]  # List of related conditions
+        
+        class Config:
+            from_attributes = True
+    
+    analysis: Analysis
+    
+    class Config:
+        from_attributes = True
+
+
+# ==================== Common Models ====================
+
+class ErrorResponse(BaseModel):
+    """Standard error response"""
+    detail: str
+    error_code: Optional[str] = None

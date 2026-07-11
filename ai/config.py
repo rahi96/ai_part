@@ -3,36 +3,41 @@ Navelle AI Module — Configuration
 Loads all environment variables via pydantic-settings.
 """
 from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
     # ── App ──────────────────────────────────────────────────────────────────
     app_name: str = "Navelle AI Module"
     debug: bool = False
 
-    # ── AWS Bedrock ──────────────────────────────────────────────────────────────
-    bedrock_model_id: str = "meta.llama3-70b-instruct-v1:0"
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
-    aws_region: str = "us-east-1"
+    # ── OpenAI ───────────────────────────────────────────────────────────────
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o"
 
     # ── Backend API ──────────────────────────────────────────────────────────
     backend_url: str = "http://13.51.155.66:8989"
     customer_token: str = ""
     admin_token: str = ""
 
-    # ── MongoDB ──────────────────────────────────────────────────────────────
-    mongodb_uri: str = ""
+    # ── Pinecone ─────────────────────────────────────────────────────────────
+    pinecone_api_key: str = ""
+    pinecone_index_name: str = "navelle-medical-docs"
+    pinecone_environment: str = "us-east-1"
+
+    # ── AWS Bedrock (Claude) ────────────────────────────────────────────────
+    bedrock_model_id: str = "anthropic.claude-opus-4-5-20251101-v1:0"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "us-east-1"
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
 
     @property
-    def APP_NAME(self) -> str:
+    def APP_NAME(self) -> str: 
         return self.app_name
 
 

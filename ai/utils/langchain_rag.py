@@ -1,7 +1,7 @@
 """
 Navelle AI Module — LangChain RAG Pipeline
-Generates personalised GPT-4 responses using health context and
-direct document chunks (no vector database).
+Embeds user queries, retrieves relevant medical context from Pinecone,
+and generates personalised GPT-4 responses.
 """
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ import logging
 from typing import Any
 
 from ai.config import settings
-from ai.utils.llm_call import llm_call
+from ai.utils.bedrock_llm import bedrock_llm
+from ai.utils.pinecone_client import pinecone_client
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,6 @@ def _build_health_context(health_data: dict) -> str:
     symptoms = health_data.get("symptoms", [])
     menstrual = health_data.get("menstrual_trackers", [])
     medical = health_data.get("medical_histories", [])
-    labs = health_data.get("lab_histories", [])
 
     lines = []
 
@@ -81,37 +81,41 @@ def _build_health_context(health_data: dict) -> str:
         conditions = ", ".join(m.get("condition", "?") for m in medical)
         lines.append(f"**Medical History:** {conditions}")
 
-    if labs:
-        most_recent = labs[0]  # Assume sorted by date, newest first
-        lab_notes = most_recent.get("notes", "")
-        lab_date = most_recent.get("date", "")
-        lines.append(f"**Recent Lab Results ({lab_date}):** {lab_notes}")
-        if most_recent.get("file_url"):
-            lines.append(f"Lab document: {most_recent['file_url']}")
-
     return "\n".join(lines) if lines else "Minimal health data available."
 
 
 def _build_rag_context(retrieved_docs: list[dict]) -> str:
-    """Format retrieved documents as a context block."""
+    """Format retrieved Pinecone documents as a context block."""
     if not retrieved_docs:
         return ""
 
-    lines = ["**Relevant Documents:**"]
+    lines = ["**Relevant Medical Knowledge:**"]
     for i, doc in enumerate(retrieved_docs, 1):
-        title = doc.get("topic") or doc.get("document_title", "Untitled")
-        content = doc.get("content") or doc.get("content_preview", "")
-        lines.append(f"\n[Source {i}: {title}]\n{content}")
+        lines.append(f"\n[Source {i}: {doc['topic']}]\n{doc['content']}")
 
     return "\n".join(lines)
 
 
 class RAGPipeline:
     """
-    Retrieval-Augmented Generation pipeline using AWS Bedrock Claude.
+    Retrieval-Augmented Generation pipeline using Pinecone + GPT-4.
+    Falls back gracefully if OpenAI or Pinecone is unavailable.
     """
 
-    async def generate(
+    def __init__(self) -> None:
+        self._ready = False
+
+    def _init_client(self) -> bool:
+        if self._ready:
+            return True
+        if not bedrock_llm.is_available():
+            logger.warning("Bedrock not available — RAG pipeline unavailable")
+            return False
+        self._ready = True
+        logger.info("RAG pipeline initialised with Bedrock model: %s", bedrock_llm.get_model())
+        return True
+
+    def generate(
         self,
         user_message: str,
         health_data: dict | None = None,
@@ -130,6 +134,8 @@ class RAGPipeline:
                 "fallback_used": bool
             }
         """
+        if not self._init_client():
+            return self._fallback_response(user_message)
 
         health_ctx = _build_health_context(health_data or {})
         rag_ctx = _build_rag_context(retrieved_docs or [])
@@ -155,13 +161,12 @@ class RAGPipeline:
         messages.append({"role": "user", "content": "\n".join(user_content_parts)})
 
         try:
-            answer = await llm_call.chat_completion(
+            answer = bedrock_llm.chat_completion(
                 messages=messages,
                 max_tokens=800,
                 temperature=0.7,
             )
-            if not answer:
-                answer = ""
+
             sources = [doc["topic"] for doc in (retrieved_docs or [])]
 
             # Estimate confidence from retrieval scores
@@ -174,18 +179,18 @@ class RAGPipeline:
             return {
                 "response": answer + DISCLAIMER,
                 "sources": sources,
-                "model": "bedrock",
+                "model": bedrock_llm.get_model(),
                 "confidence": confidence,
                 "fallback_used": False,
             }
 
         except Exception as exc:
             logger.error("Bedrock generation failed: %s", exc)
-            return await self._generate_general_knowledge_response(
+            return self._generate_general_knowledge_response(
                 user_message, health_data, conversation_history
             )
 
-    async def _generate_general_knowledge_response(
+    def _generate_general_knowledge_response(
         self,
         user_message: str,
         health_data: dict | None = None,
@@ -193,8 +198,21 @@ class RAGPipeline:
     ) -> dict:
         """
         Generate response using LLM general knowledge when RAG fails.
-        This provides helpful answers even without retrieved documents.
+        This provides helpful answers even without Pinecone context.
         """
+        if not self._init_client():
+            # Only return error if Bedrock itself is unavailable
+            return {
+                "response": (
+                    "I'm having trouble connecting to my knowledge base right now. "
+                    "Please try again in a moment, or contact your healthcare provider "
+                    "directly for immediate support." + DISCLAIMER
+                ),
+                "sources": [],
+                "model": "fallback",
+                "confidence": 0.0,
+                "fallback_used": True,
+            }
 
         health_ctx = _build_health_context(health_data or {})
 
@@ -234,18 +252,16 @@ You MUST NOT:
         messages.append({"role": "user", "content": "\n".join(user_content_parts)})
 
         try:
-            answer = await llm_call.chat_completion(
+            answer = bedrock_llm.chat_completion(
                 messages=messages,
                 max_tokens=800,
                 temperature=0.7,
             )
-            if not answer:
-                answer = ""
 
             return {
                 "response": answer + DISCLAIMER,
                 "sources": [],  # No RAG sources when using general knowledge
-                "model": "bedrock",
+                "model": bedrock_llm.get_model(),
                 "confidence": 0.7,  # Good confidence for general knowledge
                 "fallback_used": False,  # This is not a fallback - it's general knowledge mode
             }
@@ -265,7 +281,7 @@ You MUST NOT:
                 "fallback_used": True,
             }
 
-    async def _fallback_response(
+    def _fallback_response(
         self,
         user_message: str,
         health_data: dict | None = None,
@@ -273,7 +289,7 @@ You MUST NOT:
     ) -> dict:
         """Legacy fallback - redirects to general knowledge mode."""
         logger.info("RAG failed - using general knowledge mode instead of template fallback")
-        return await self._generate_general_knowledge_response(
+        return self._generate_general_knowledge_response(
             user_message, health_data, conversation_history
         )
 
@@ -310,18 +326,17 @@ class IntentClassifier:
         """
         msg_lower = message.lower().strip()
 
-        # Too vague — needs clarification
-        if len(msg_lower.split()) <= 3 or any(t in msg_lower for t in self.CLARIFICATION_TRIGGERS):
-            if not any(k in msg_lower for k in self.MEDICAL_KEYWORDS):
-                return "needs_clarification"
-
-        # Greeting
+        # Greeting — check first so "hello", "hi" etc. are never misrouted
         if any(g in msg_lower for g in self.GREETING_KEYWORDS):
             return "greeting"
 
         # Medical keywords
         if any(k in msg_lower for k in self.MEDICAL_KEYWORDS):
             return "medical_query"
+
+        # Too vague — needs clarification
+        if len(msg_lower.split()) <= 3 or any(t in msg_lower for t in self.CLARIFICATION_TRIGGERS):
+            return "needs_clarification"
 
         return "general"
 

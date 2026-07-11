@@ -1,3 +1,7 @@
+"""
+Navelle AI Module — Journey Service
+Handles health goal creation and journey plan generation using modular LLM utilities.
+"""
 from __future__ import annotations
 
 import json
@@ -7,7 +11,7 @@ from typing import List, Optional
 
 from ai.models.schemas import HealthGoalCreateRequest, JourneyPlanResponse, GoalProgressItem
 from ai.utils.backend_client import backend_client
-from ai.utils.document_processor import _download_file, _extract_text
+from ai.utils.file_parser import file_parser
 from ai.utils.llm_call import llm_call
 from ai.utils.llm_response_parser import llm_parser
 
@@ -40,17 +44,7 @@ class JourneyService:
             report_text = ""
             if file_url:
                 logger.info(f"Processing lab file: {file_url}")
-                try:
-                    data = _download_file(file_url)
-                    if data:
-                        # Try to get a filename from the URL or use a default
-                        from urllib.parse import urlparse
-                        parsed = urlparse(file_url)
-                        file_name = parsed.path.split('/')[-1] or "report.pdf"
-                        extracted = _extract_text(file_name, data)
-                        report_text = extracted or ""
-                except Exception as exc:
-                    logger.warning(f"Failed to extract text from {file_url}: {exc}")
+                report_text = await file_parser.extract_text_from_url(file_url)
             
             part = f"Report {i+1} Date: {lab.get('date', 'Unknown')}\n"
             part += f"Clinical Notes: {notes}\n"
@@ -113,7 +107,8 @@ Return a JSON object matching the JourneyPlanResponse structure:
             # 4. Execute LLM call with a larger token limit for the document context
             raw_response = await llm_call.chat_completion(
                 messages=messages,
-                max_tokens=1500
+                max_tokens=1500,
+                response_format={"type": "json_object"}
             )
             
             # 5. Parse and return

@@ -1,6 +1,13 @@
+"""
+Navelle AI Module — Wellness Routes
+Mood check-in and humor break. Fully stateless — no database required.
+"""
 from __future__ import annotations
+
 import logging
+
 from fastapi import APIRouter, Body
+
 from ai.services.wellness_service import WellnessService
 
 logger = logging.getLogger(__name__)

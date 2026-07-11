@@ -14,7 +14,6 @@ __pycache__/
 .Python
 env/
 venv/
-.venv/
 ENV/
 build/
 dist/
@@ -66,14 +65,13 @@ Thumbs.db
 test_api_data.json
 test_apis.py
 swagger_test_data.md
-test_*.py
-test_*.ps1
-test_output.txt
-list_bedrock_models.py
 .ipynb_checkpoints/
 
 # --- Tools ---
 *.postman_collection.json
 .dockerignore
 .docker-compose.override.yml
-
+python_installer.exe
+.python311/
+venv/
+.venv/
