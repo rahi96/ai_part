@@ -340,9 +340,8 @@ def node_generate_response(state: ChatState) -> ChatState:
     health_data = state.get("health_data", {})
     history = state.get("conversation_history", [])
 
-    if intent == "medical_query":
-        # Use LLM general knowledge for medical queries
-        # (No Pinecone RAG - simplified architecture)
+    if intent in ("medical_query", "general"):
+        # Use LLM general knowledge for medical and general queries
         result = rag_pipeline.generate(
             user_message=message,
             health_data=health_data,
@@ -355,7 +354,7 @@ def node_generate_response(state: ChatState) -> ChatState:
             "retrieved_docs": [],
             "response": result["response"],
             "confidence": result["confidence"],
-            "response_source": "general_knowledge",
+            "response_source": "general_knowledge" if intent == "medical_query" else "ai_general",
         }
 
     elif intent in ("needs_clarification",):
@@ -379,7 +378,7 @@ def node_generate_response(state: ChatState) -> ChatState:
         }
 
     else:
-        # General — try keyword fallback
+        # Default fallback
         response = _get_fallback_response(intent, message)
         return {
             **state,

@@ -6,6 +6,7 @@ and generates personalised GPT-4 responses.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from ai.config import settings
@@ -23,24 +24,17 @@ DISCLAIMER = (
 )
 
 # ── System Prompt ──────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """You are Mennie™, a compassionate and knowledgeable AI wellness companion \
-for the Navelle perimenopause support platform.
+SYSTEM_PROMPT = """You are Mennie™, a warm, supportive, and compassionate AI mood-tracking and wellness companion for the Navelle perimenopause support platform.
 
-Your role:
-- Provide accurate, evidence-based information about perimenopause and menopause
-- Personalise responses using the user's health data provided
-- Be warm, empathetic, and supportive — this journey can be overwhelming
-- Always recommend consulting a healthcare provider for medical decisions
-- Cite the sources provided in your response when relevant
-- Keep responses clear, concise, and actionable
-
-You MUST NOT:
-- Diagnose conditions
-- Prescribe medications or specific dosages
-- Replace professional medical advice
-- Make absolute claims about treatments
-
-Language: Be conversational but professional. Avoid overly clinical language."""
+Your goals:
+- Listen first. Reflect the user's feelings and experience back to her warmly before giving any advice or information.
+- Use soft, natural, and conversational language. Avoid clinical jargon, cold terminology, or robotic/repetitive phrasing.
+- Never judge, minimize, or rush past what she shares. Create a safe, validated space.
+- Ask at most one gentle follow-up question at a time to encourage her to share or track her mood.
+- Keep responses short and concise (2-4 sentences) to keep the conversation manageable, unless she explicitly asks for detailed information.
+- Never diagnose any conditions. If she describes symptoms of depression, anxiety, or other mental health conditions, gently suggest talking to a professional instead of naming a specific diagnosis.
+- If she expresses self-harm, suicidal thoughts, or crisis symptoms, respond with deep care and immediately provide crisis resources (e.g., 'If you're in distress, please contact the 988 Suicide & Crisis Lifeline or call emergency services right away. You are not alone.') — do not wait, deflect, or ignore it.
+- Avoid generic, repetitive empathetic phrases like 'I understand' or 'I hear you'. Vary your empathy naturally so it feels genuine and unscripted."""
 
 
 def _build_health_context(health_data: dict) -> str:
@@ -326,17 +320,20 @@ class IntentClassifier:
         """
         msg_lower = message.lower().strip()
 
-        # Greeting — check first so "hello", "hi" etc. are never misrouted
-        if any(g in msg_lower for g in self.GREETING_KEYWORDS):
-            return "greeting"
-
-        # Medical keywords
+        # Medical keywords (check first so greetings prefixed to medical queries are not intercepted)
         if any(k in msg_lower for k in self.MEDICAL_KEYWORDS):
             return "medical_query"
 
-        # Too vague — needs clarification
-        if len(msg_lower.split()) <= 3 or any(t in msg_lower for t in self.CLARIFICATION_TRIGGERS):
-            return "needs_clarification"
+        # Greeting — check using word boundaries to avoid matching "hi" inside "history" or "high"
+        greeting_pattern = r"\b(" + "|".join(re.escape(g) for g in self.GREETING_KEYWORDS) + r")\b"
+        if re.search(greeting_pattern, msg_lower):
+            return "greeting"
+
+        # Too vague — needs clarification (only trigger if the message is short and contains triggers, or is extremely short)
+        words_count = len(msg_lower.split())
+        if words_count <= 4:
+            if words_count <= 2 or any(re.search(r"\b" + re.escape(t) + r"\b", msg_lower) for t in self.CLARIFICATION_TRIGGERS):
+                return "needs_clarification"
 
         return "general"
 
