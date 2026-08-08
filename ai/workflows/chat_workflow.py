@@ -532,7 +532,8 @@ async def run_chat_workflow(
         "thread_id": resolved_thread_id,
         "intent": final_state["intent"],
         "confidence": final_state["confidence"],
-        "sources": [d["topic"] for d in final_state.get("retrieved_docs", [])],
+        "sources": [d["topic"] for d in final_state.get("retrieved_docs", [])],  # Kept for backward compatibility
+        "retrieved_docs": final_state.get("retrieved_docs", []),  # Full docs with source URLs
         "response_source": final_state["response_source"],
         "is_new_thread": is_new,
     }

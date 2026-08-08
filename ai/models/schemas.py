@@ -151,6 +151,13 @@ class ChatMessageRequest(BaseModel):
     thread_id: Optional[str] = None  # Existing thread ID (optional)
 
 
+class SourceReference(BaseModel):
+    """External source reference with URL"""
+    topic: str  # Document topic/title
+    url: str  # External source URL (website, journal, etc.)
+    source_name: str  # Organization name (e.g., "Mayo Clinic")
+
+
 class ChatMessageResponse(BaseModel):
     """Response from chatbot with AI attribution for app store compliance"""
     response: str  # AI-generated reply with embedded disclaimer
@@ -162,7 +169,7 @@ class ChatMessageResponse(BaseModel):
     ai_attribution: str  # AI attribution header for UI display
     is_ai_generated: bool = True  # Always True - indicates AI-generated content
     medical_disclaimer: str  # Short disclaimer for quick reference
-    sources: Optional[List[str]] = []  # Medical sources referenced
+    sources: Optional[List[SourceReference]] = []  # External source references with URLs
     response_source: str  # "general_knowledge" | "template" | etc.
     
     class Config:

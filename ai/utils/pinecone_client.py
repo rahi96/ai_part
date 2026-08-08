@@ -28,6 +28,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "symptoms",
         "keywords": ["hot flashes", "vasomotor", "estrogen", "hypothalamus", "thermoregulation"],
+        "source_url": "https://www.mayoclinic.org/diseases-conditions/menopause/symptoms-causes/syc-20353397",
+        "source_name": "Mayo Clinic",
     },
     {
         "id": "doc_002",
@@ -41,6 +43,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "management",
         "keywords": ["hot flashes", "non-hormonal", "CBT", "cooling", "triggers", "breathing"],
+        "source_url": "https://www.hopkinsmedicine.org/health/wellness-and-prevention/managing-menopause-symptoms",
+        "source_name": "Johns Hopkins Medicine",
     },
     {
         "id": "doc_003",
@@ -54,6 +58,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "treatment",
         "keywords": ["HRT", "hormone replacement", "estrogen", "progesterone", "hot flashes", "menopause treatment"],
+        "source_url": "https://www.nhs.uk/conditions/hormone-replacement-therapy-hrt/",
+        "source_name": "NHS UK",
     },
     {
         "id": "doc_004",
@@ -67,6 +73,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "symptoms",
         "keywords": ["night sweats", "nocturnal", "sleep disruption", "perimenopause", "hormones"],
+        "source_url": "https://www.hopkinsmedicine.org/health/conditions-and-diseases/introduction-to-menopause",
+        "source_name": "Johns Hopkins Medicine",
     },
     {
         "id": "doc_005",
@@ -80,6 +88,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "management",
         "keywords": ["night sweats", "sleep hygiene", "cooling", "CBT-I", "insomnia", "alcohol"],
+        "source_url": "https://www.sleepfoundation.org/menopause/menopause-and-sleep",
+        "source_name": "Sleep Foundation",
     },
     {
         "id": "doc_006",
@@ -93,6 +103,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "symptoms",
         "keywords": ["mood swings", "estrogen", "serotonin", "dopamine", "neurotransmitters", "irritability"],
+        "source_url": "https://www.health.harvard.edu/womens-health/perimenopause-rocky-road-to-menopause",
+        "source_name": "Harvard Health",
     },
     {
         "id": "doc_007",
@@ -107,6 +119,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "mental_health",
         "keywords": ["anxiety", "perimenopause", "panic attacks", "MBSR", "CBT", "HRT", "SSRI"],
+        "source_url": "https://www.nhs.uk/mental-health/feelings-symptoms-behaviours/feelings-and-symptoms/anxiety-fear-panic/",
+        "source_name": "NHS UK",
     },
     {
         "id": "doc_008",
@@ -121,6 +135,8 @@ MEDICAL_DOCUMENTS: list[dict] = [
         ),
         "category": "mental_health",
         "keywords": ["depression", "perimenopause", "antidepressants", "CBT", "HRT", "mental health"],
+        "source_url": "https://www.nimh.nih.gov/health/publications/depression-women",
+        "source_name": "NIMH",
     },
     {
         "id": "doc_009",

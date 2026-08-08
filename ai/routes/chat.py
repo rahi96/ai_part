@@ -62,10 +62,20 @@ async def chat_message(
     # Get AI model info for transparency
     from ai.config import settings
     from ai.utils.langchain_rag import get_ai_attribution_header
+    from ai.models.schemas import SourceReference
     
     ai_model = settings.openai_model if settings.openai_api_key else settings.bedrock_model_id
     if not ai_model:
         ai_model = "AI Language Model"
+    
+    # Transform retrieved_docs into SourceReference objects with URLs
+    source_references = []
+    for doc in result.get("retrieved_docs", []):
+        source_references.append(SourceReference(
+            topic=doc.get("topic", "Unknown"),
+            url=doc.get("source_url", ""),
+            source_name=doc.get("source_name", "Medical Knowledge Base")
+        ))
     
     return {
         "user_id": user_id,
@@ -75,7 +85,7 @@ async def chat_message(
         "response": result["response"],
         "intent": result["intent"],
         "confidence": result["confidence"],
-        "sources": result["sources"],
+        "sources": source_references,  # Now returns SourceReference objects with URLs
         "response_source": result["response_source"],
         # App Store Compliance: Explicit AI attribution
         "ai_model": ai_model,
