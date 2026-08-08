@@ -1,11 +1,15 @@
 """
 Navelle AI Module — Pinecone Vector Store Client
 Seeds and searches 23 perimenopause medical knowledge documents.
+Uses AWS Bedrock Titan embeddings instead of OpenAI.
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
+
+import boto3
 
 from ai.config import settings
 
@@ -334,10 +338,68 @@ MEDICAL_DOCUMENTS: list[dict] = [
 ]
 
 
+class BedrockTitanEmbeddings:
+    """
+    AWS Bedrock Titan embeddings wrapper compatible with LangChain interface.
+    Uses Amazon Titan Embed Text V2 model (1024 dimensions).
+    """
+
+    def __init__(
+        self,
+        region_name: str,
+        aws_access_key_id: str,
+        aws_secret_access_key: str,
+        model_id: str = "amazon.titan-embed-text-v2:0",
+    ):
+        self.model_id = model_id
+        self.client = boto3.client(
+            "bedrock-runtime",
+            region_name=region_name,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+        )
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Embed a list of documents using Bedrock Titan."""
+        embeddings = []
+        for text in texts:
+            try:
+                response = self.client.invoke_model(
+                    modelId=self.model_id,
+                    body=json.dumps({
+                        "inputText": text[:8000],  # Titan max input is ~8K tokens
+                    }),
+                )
+                response_body = json.loads(response["body"].read())
+                embeddings.append(response_body["embedding"])
+            except Exception as exc:
+                logger.error("Failed to embed text with Bedrock Titan: %s", exc)
+                # Return zero vector as fallback
+                embeddings.append([0.0] * 1024)
+        return embeddings
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a single query using Bedrock Titan."""
+        try:
+            response = self.client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps({
+                    "inputText": text[:8000],  # Titan max input is ~8K tokens
+                }),
+            )
+            response_body = json.loads(response["body"].read())
+            return response_body["embedding"]
+        except Exception as exc:
+            logger.error("Failed to embed query with Bedrock Titan: %s", exc)
+            # Return zero vector as fallback
+            return [0.0] * 1024
+
+
 class PineconeClient:
     """
     Wrapper around Pinecone for perimenopause medical knowledge.
     Initialises lazily to avoid blocking app startup.
+    Uses AWS Bedrock Titan embeddings (1024 dimensions).
     """
 
     def __init__(self) -> None:
@@ -352,15 +414,20 @@ class PineconeClient:
         if self._ready:
             return True
 
-        if not settings.pinecone_api_key or not settings.openai_api_key:
+        if not settings.pinecone_api_key:
             logger.warning(
-                "Pinecone or OpenAI credentials not configured — vector search unavailable."
+                "Pinecone credentials not configured — vector search unavailable."
+            )
+            return False
+
+        if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+            logger.warning(
+                "AWS credentials not configured — vector search unavailable."
             )
             return False
 
         try:
             from pinecone import Pinecone, ServerlessSpec  # type: ignore
-            from langchain_openai import OpenAIEmbeddings
 
             pc = Pinecone(api_key=settings.pinecone_api_key)
             index_name = settings.pinecone_index_name
@@ -371,18 +438,22 @@ class PineconeClient:
                 logger.info("Creating Pinecone index: %s", index_name)
                 pc.create_index(
                     name=index_name,
-                    dimension=1536,  # text-embedding-ada-002 dimension
+                    dimension=1024,  # Amazon Titan Embed Text V2 dimension
                     metric="cosine",
                     spec=ServerlessSpec(cloud="aws", region=settings.pinecone_environment),
                 )
 
             self._index = pc.Index(index_name)
-            self._embeddings = OpenAIEmbeddings(
-                api_key=settings.openai_api_key,
-                model="text-embedding-ada-002",
+            
+            # Initialize Bedrock Titan embeddings
+            self._embeddings = BedrockTitanEmbeddings(
+                region_name=settings.aws_region,
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
             )
+            
             self._ready = True
-            logger.info("Pinecone client initialised — index: %s", index_name)
+            logger.info("Pinecone client initialised with Bedrock Titan embeddings — index: %s", index_name)
             return True
 
         except Exception as exc:

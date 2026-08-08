@@ -25,8 +25,9 @@ class Settings(BaseSettings):
     pinecone_index_name: str = "navelle-medical-docs"
     pinecone_environment: str = "us-east-1"
 
-    # ── AWS Bedrock (Claude) ────────────────────────────────────────────────
+    # ── AWS Bedrock (Claude + Titan Embeddings) ─────────────────────────────
     bedrock_model_id: str = "anthropic.claude-opus-4-5-20251101-v1:0"
+    bedrock_embeddings_model_id: str = "amazon.titan-embed-text-v2:0"
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
