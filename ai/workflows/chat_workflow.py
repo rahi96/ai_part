@@ -341,51 +341,66 @@ def node_generate_response(state: ChatState) -> ChatState:
     history = state.get("conversation_history", [])
 
     if intent in ("medical_query", "general"):
-        # Use LLM general knowledge for medical and general queries
+        # Retrieve relevant medical documents
+        from ai.utils.pinecone_client import pinecone_client
+        retrieved_docs = pinecone_client.search(message, top_k=3)
+
         result = rag_pipeline.generate(
             user_message=message,
             health_data=health_data,
-            retrieved_docs=[],  # No RAG
+            retrieved_docs=retrieved_docs,
             conversation_history=history,
         )
 
         return {
             **state,
-            "retrieved_docs": [],
+            "retrieved_docs": retrieved_docs,
             "response": result["response"],
             "confidence": result["confidence"],
             "response_source": "general_knowledge" if intent == "medical_query" else "ai_general",
         }
 
     elif intent in ("needs_clarification",):
+        from ai.utils.langchain_rag import get_ai_attribution_header
+        ai_header = get_ai_attribution_header()
         response = _get_fallback_response("needs_clarification", message)
+        # Prepend AI attribution to template response
+        response = f"{ai_header}\\n\\n{response}"
         return {
             **state,
             "retrieved_docs": [],
             "response": response,
             "confidence": 1.0,
-            "response_source": "clarification",
+            "response_source": "clarification_template",
         }
 
     elif intent == "greeting":
+        from ai.utils.langchain_rag import get_ai_attribution_header
+        ai_header = get_ai_attribution_header()
         response = _get_fallback_response("greeting", message)
+        # Prepend AI attribution to template response
+        response = f"{ai_header}\\n\\n{response}"
         return {
             **state,
             "retrieved_docs": [],
             "response": response,
             "confidence": 1.0,
-            "response_source": "greeting",
+            "response_source": "greeting_template",
         }
 
     else:
-        # Default fallback
+        # Default fallback templates
+        from ai.utils.langchain_rag import get_ai_attribution_header
+        ai_header = get_ai_attribution_header()
         response = _get_fallback_response(intent, message)
+        # Prepend AI attribution to template response
+        response = f"{ai_header}\\n\\n{response}"
         return {
             **state,
             "retrieved_docs": [],
             "response": response,
             "confidence": 0.8,
-            "response_source": "template",
+            "response_source": "knowledge_template",
         }
 
 
@@ -393,10 +408,26 @@ def node_generate_response(state: ChatState) -> ChatState:
 
 def node_inject_disclaimer(state: ChatState) -> ChatState:
     """Ensure healthcare disclaimer is present in every response."""
+    from ai.utils.langchain_rag import AI_DISCLAIMER
+    from ai.config import settings
+    
     response = state["response"]
-    # Only add if not already present (RAG pipeline adds it, templates don't)
-    if DISCLAIMER.strip() not in response:
-        response = response + DISCLAIMER
+    response_source = state.get("response_source", "")
+    
+    # Determine if this is a template response (needs enhanced disclaimer)
+    is_template = "template" in response_source
+    
+    # Only add if not already present (RAG pipeline adds it, templates need it)
+    if "Important Medical Disclaimer" not in response and "educational purposes only" not in response:
+        # Get the AI model for attribution in disclaimer
+        model_name = settings.openai_model if settings.openai_api_key else settings.bedrock_model_id
+        if not model_name:
+            model_name = "AI Language Model"
+        
+        # Use enhanced disclaimer for better app store compliance
+        disclaimer = AI_DISCLAIMER.format(ai_model=model_name)
+        response = response + disclaimer
+    
     return {**state, "response": response, "disclaimer_added": True}
 
 

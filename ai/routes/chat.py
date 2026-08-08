@@ -59,6 +59,14 @@ async def chat_message(
     except Exception as exc:
         logger.warning("Analytics record failed (non-critical): %s", exc)
 
+    # Get AI model info for transparency
+    from ai.config import settings
+    from ai.utils.langchain_rag import get_ai_attribution_header
+    
+    ai_model = settings.openai_model if settings.openai_api_key else settings.bedrock_model_id
+    if not ai_model:
+        ai_model = "AI Language Model"
+    
     return {
         "user_id": user_id,
         "thread_id": result["thread_id"],
@@ -69,6 +77,11 @@ async def chat_message(
         "confidence": result["confidence"],
         "sources": result["sources"],
         "response_source": result["response_source"],
+        # App Store Compliance: Explicit AI attribution
+        "ai_model": ai_model,
+        "ai_attribution": get_ai_attribution_header(),
+        "is_ai_generated": True,
+        "medical_disclaimer": "This is AI-generated educational content, not medical advice. Always consult your healthcare provider.",
     }
 
 

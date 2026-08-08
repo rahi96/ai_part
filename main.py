@@ -4,10 +4,12 @@ Registers all AI module routes
 """
 import logging
 import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from ai.routes import analysis, wellness, analytics, chat, journey, medical_history
 from ai.config import settings
+from ai.utils.pinecone_client import pinecone_client
 
 # Configure logging
 logging.basicConfig(
@@ -16,11 +18,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for seeding Pinecone index on startup"""
+    import asyncio
+    logger.info("Initializing vector store seeding on startup...")
+    # Seed documents as a background task to prevent blocking application start
+    asyncio.create_task(pinecone_client.seed_documents())
+    yield
+
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI wellness and health analysis API for Navelle",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Add logging middleware

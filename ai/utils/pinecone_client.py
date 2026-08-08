@@ -436,14 +436,56 @@ class PineconeClient:
             logger.error("Failed to seed Pinecone: %s", exc)
             return 0
 
+    def _local_search(self, query: str, top_k: int = 5) -> list[dict]:
+        """
+        Fallback search over local MEDICAL_DOCUMENTS using basic keyword relevance matching.
+        """
+        import re
+        query_words = set(re.findall(r'\w+', query.lower()))
+        if not query_words:
+            return []
+        
+        scored_docs = []
+        for doc in MEDICAL_DOCUMENTS:
+            score = 0.0
+            
+            # Match keywords (exact matches get a high boost)
+            keywords = [k.lower() for k in doc.get("keywords", [])]
+            for kw in keywords:
+                if kw in query.lower():
+                    score += 3.0
+            
+            # Word matches with topic
+            topic_words = set(re.findall(r'\w+', doc.get("topic", "").lower()))
+            topic_matches = query_words.intersection(topic_words)
+            score += len(topic_matches) * 2.0
+            
+            # Word matches with content
+            content_words = set(re.findall(r'\w+', doc.get("content", "").lower()))
+            content_matches = query_words.intersection(content_words)
+            score += len(content_matches) * 0.2
+            
+            if score > 0:
+                normalized_score = min(score / 15.0, 1.0)
+                scored_docs.append({
+                    "topic": doc["topic"],
+                    "content": doc["content"],
+                    "category": doc["category"],
+                    "score": round(normalized_score, 3),
+                })
+        
+        # Sort by score descending
+        scored_docs.sort(key=lambda x: x["score"], reverse=True)
+        return scored_docs[:top_k]
+
     def search(self, query: str, top_k: int = 5) -> list[dict]:
         """
         Search for the most relevant medical documents for a query.
         Returns list of { topic, content, category, score }.
         """
         if not self._init():
-            logger.warning("Pinecone not available — returning empty results")
-            return []
+            logger.warning("Pinecone not available — returning local search results")
+            return self._local_search(query, top_k=top_k)
 
         try:
             query_embedding = self._embeddings.embed_query(query)
@@ -452,19 +494,24 @@ class PineconeClient:
                 top_k=top_k,
                 include_metadata=True,
             )
-            return [
+            matches = results.get("matches", [])
+            ret = [
                 {
                     "topic": match.get("metadata", {}).get("topic", ""),
                     "content": match.get("metadata", {}).get("content", ""),
                     "category": match.get("metadata", {}).get("category", ""),
                     "score": round(match.get("score", 0), 3),
                 }
-                for match in results.get("matches", [])
+                for match in matches
                 if match.get("score", 0) > 0.6  # relevance threshold
             ]
+            if not ret:
+                logger.info("Pinecone search returned no results above threshold — falling back to local search")
+                return self._local_search(query, top_k=top_k)
+            return ret
         except Exception as exc:
-            logger.error("Pinecone search failed: %s", exc)
-            return []
+            logger.error("Pinecone search failed: %s — falling back to local search", exc)
+            return self._local_search(query, top_k=top_k)
 
     def store_user_documents(
         self,

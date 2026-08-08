@@ -152,11 +152,18 @@ class ChatMessageRequest(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
-    """Response from chatbot"""
-    response: str  # AI-generated reply
+    """Response from chatbot with AI attribution for app store compliance"""
+    response: str  # AI-generated reply with embedded disclaimer
     confidence_score: float  # 0-1, displayed as percentage
     timestamp: datetime
     thread_id: str  # Generated or existing thread ID
+    # App Store Compliance Fields
+    ai_model: str  # Specific AI model used (e.g., "gpt-4o", "claude-opus-4")
+    ai_attribution: str  # AI attribution header for UI display
+    is_ai_generated: bool = True  # Always True - indicates AI-generated content
+    medical_disclaimer: str  # Short disclaimer for quick reference
+    sources: Optional[List[str]] = []  # Medical sources referenced
+    response_source: str  # "general_knowledge" | "template" | etc.
     
     class Config:
         from_attributes = True

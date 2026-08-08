@@ -15,7 +15,34 @@ from ai.utils.pinecone_client import pinecone_client
 
 logger = logging.getLogger(__name__)
 
-# ── Healthcare Disclaimer ──────────────────────────────────────────────────────
+# ── AI Attribution & Healthcare Disclaimer ─────────────────────────────────────
+
+def get_ai_attribution_header() -> str:
+    """Returns the AI model being used for transparency."""
+    model = settings.openai_model if settings.openai_api_key else settings.bedrock_model_id
+    if "gpt" in model.lower():
+        return "🤖 **AI Response** (Powered by OpenAI GPT-4)"
+    elif "claude" in model.lower():
+        return "🤖 **AI Response** (Powered by Anthropic Claude)"
+    else:
+        return "🤖 **AI-Generated Response**"
+
+
+AI_DISCLAIMER = (
+    "\n\n---\n"
+    "### ⚕️ Important Medical Disclaimer\n\n"
+    "**This is an AI-generated response and NOT medical advice.**\n\n"
+    "• **AI Model:** {ai_model}\n"
+    "• **Medical Sources:** Peer-reviewed research on perimenopause/menopause wellness\n"
+    "• **Purpose:** Educational support and general wellness information only\n"
+    "• **Not a substitute for:** Professional medical advice, diagnosis, or treatment\n\n"
+    "**Always consult your qualified healthcare provider before making health decisions.**\n\n"
+    "🚨 **Emergency:** If experiencing severe symptoms or crisis, contact emergency services (911) "
+    "or the 988 Suicide & Crisis Lifeline immediately.\n"
+    "---"
+)
+
+# Legacy simple disclaimer for backwards compatibility
 DISCLAIMER = (
     "\n\n---\n"
     "⚕️ *This information is for educational purposes only and is not a substitute "
@@ -94,6 +121,7 @@ class RAGPipeline:
     """
     Retrieval-Augmented Generation pipeline using Pinecone + GPT-4.
     Falls back gracefully if OpenAI or Pinecone is unavailable.
+    Includes mandatory AI attribution for app store compliance.
     """
 
     def __init__(self) -> None:
@@ -163,6 +191,11 @@ class RAGPipeline:
 
             sources = [doc["topic"] for doc in (retrieved_docs or [])]
 
+            # Formulate sources section for App Store compliance
+            sources_text = ""
+            if sources:
+                sources_text = "\n\n**Medical Sources Referenced:** " + ", ".join(sources)
+
             # Estimate confidence from retrieval scores
             if retrieved_docs:
                 avg_score = sum(d.get("score", 0) for d in retrieved_docs) / len(retrieved_docs)
@@ -170,18 +203,31 @@ class RAGPipeline:
             else:
                 confidence = 0.5  # reasonable baseline for template answers
 
+            # Get AI model info for attribution
+            model_name = bedrock_llm.get_model()
+            ai_header = get_ai_attribution_header()
+            
+            # Format disclaimer with actual model info
+            disclaimer = AI_DISCLAIMER.format(
+                ai_model=model_name if model_name else "AI Language Model"
+            )
+
+            # Prepend AI attribution header for transparency
+            full_response = f"{ai_header}\\n\\n{answer}{sources_text}{disclaimer}"
+
             return {
-                "response": answer + DISCLAIMER,
+                "response": full_response,
                 "sources": sources,
-                "model": bedrock_llm.get_model(),
+                "model": model_name,
                 "confidence": confidence,
                 "fallback_used": False,
+                "ai_attribution": ai_header,  # Expose for UI display
             }
 
         except Exception as exc:
             logger.error("Bedrock generation failed: %s", exc)
             return self._generate_general_knowledge_response(
-                user_message, health_data, conversation_history
+                user_message, health_data, conversation_history, retrieved_docs
             )
 
     def _generate_general_knowledge_response(
@@ -189,6 +235,7 @@ class RAGPipeline:
         user_message: str,
         health_data: dict | None = None,
         conversation_history: list[dict] | None = None,
+        retrieved_docs: list[dict] | None = None,
     ) -> dict:
         """
         Generate response using LLM general knowledge when RAG fails.
@@ -196,16 +243,20 @@ class RAGPipeline:
         """
         if not self._init_client():
             # Only return error if Bedrock itself is unavailable
+            ai_header = "🤖 **System Message**"
+            disclaimer = AI_DISCLAIMER.format(ai_model="AI Service Unavailable")
+            error_msg = (
+                "I'm having trouble connecting to my knowledge base right now. "
+                "Please try again in a moment, or contact your healthcare provider "
+                "directly for immediate support."
+            )
             return {
-                "response": (
-                    "I'm having trouble connecting to my knowledge base right now. "
-                    "Please try again in a moment, or contact your healthcare provider "
-                    "directly for immediate support." + DISCLAIMER
-                ),
+                "response": f"{ai_header}\\n\\n{error_msg}{disclaimer}",
                 "sources": [],
-                "model": "fallback",
+                "model": "unavailable",
                 "confidence": 0.0,
                 "fallback_used": True,
+                "ai_attribution": ai_header,
             }
 
         health_ctx = _build_health_context(health_data or {})
@@ -252,27 +303,49 @@ You MUST NOT:
                 temperature=0.7,
             )
 
+            sources = [doc["topic"] for doc in (retrieved_docs or [])]
+            sources_text = ""
+            if sources:
+                sources_text = "\n\n**Medical Sources Referenced:** " + ", ".join(sources)
+
+            # Get AI model info for attribution
+            model_name = bedrock_llm.get_model()
+            ai_header = get_ai_attribution_header()
+            
+            # Format disclaimer with actual model info
+            disclaimer = AI_DISCLAIMER.format(
+                ai_model=model_name if model_name else "AI Language Model (General Knowledge Mode)"
+            )
+
+            # Prepend AI attribution header for transparency
+            full_response = f"{ai_header}\\n\\n{answer}{sources_text}{disclaimer}"
+
             return {
-                "response": answer + DISCLAIMER,
-                "sources": [],  # No RAG sources when using general knowledge
-                "model": bedrock_llm.get_model(),
+                "response": full_response,
+                "sources": sources,
+                "model": model_name,
                 "confidence": 0.7,  # Good confidence for general knowledge
                 "fallback_used": False,  # This is not a fallback - it's general knowledge mode
+                "ai_attribution": ai_header,
             }
 
         except Exception as exc:
             logger.error("General knowledge generation failed: %s", exc)
             # Last resort: return the generic error
+            ai_header = "🤖 **System Message**"
+            disclaimer = AI_DISCLAIMER.format(ai_model="AI Service Error")
+            error_msg = (
+                "I'm having trouble connecting to my knowledge base right now. "
+                "Please try again in a moment, or contact your healthcare provider "
+                "directly for immediate support."
+            )
             return {
-                "response": (
-                    "I'm having trouble connecting to my knowledge base right now. "
-                    "Please try again in a moment, or contact your healthcare provider "
-                    "directly for immediate support." + DISCLAIMER
-                ),
+                "response": f"{ai_header}\\n\\n{error_msg}{disclaimer}",
                 "sources": [],
-                "model": "fallback",
+                "model": "error",
                 "confidence": 0.0,
                 "fallback_used": True,
+                "ai_attribution": ai_header,
             }
 
     def _fallback_response(
