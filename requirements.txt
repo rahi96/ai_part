@@ -14,7 +14,7 @@ tiktoken
 langsmith
 
 # --- Database & Vector Store ---
-pinecone-client
+pinecone
 SQLAlchemy
 requests
 httpx
