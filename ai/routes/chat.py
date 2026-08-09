@@ -62,11 +62,14 @@ async def chat_message(
     # Get AI model info for transparency
     from ai.config import settings
     from ai.utils.langchain_rag import get_ai_attribution_header
+    from ai.utils.bedrock_llm import bedrock_llm
     from ai.models.schemas import SourceReference
     
-    ai_model = settings.openai_model if settings.openai_api_key else settings.bedrock_model_id
-    if not ai_model:
-        ai_model = "AI Language Model"
+    # Check which LLM is actually being used
+    if bedrock_llm.is_available():
+        ai_model = bedrock_llm.get_model()
+    else:
+        ai_model = settings.openai_model if settings.openai_api_key else "AI Language Model"
     
     # Transform retrieved_docs into SourceReference objects with URLs
     source_references = []

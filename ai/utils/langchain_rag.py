@@ -19,13 +19,16 @@ logger = logging.getLogger(__name__)
 
 def get_ai_attribution_header() -> str:
     """Returns the AI model being used for transparency."""
-    model = settings.openai_model if settings.openai_api_key else settings.bedrock_model_id
-    if "gpt" in model.lower():
-        return "🤖 **AI Response** (Powered by OpenAI GPT-4)"
-    elif "claude" in model.lower():
-        return "🤖 **AI Response** (Powered by Anthropic Claude)"
+    # Check which LLM is actually being used, not which API key exists
+    if bedrock_llm.is_available():
+        model = bedrock_llm.get_model()
+        if "claude" in model.lower():
+            return "🤖 **AI Response** (Powered by Anthropic Claude)"
+        else:
+            return f"🤖 **AI Response** (Powered by AWS Bedrock: {model})"
     else:
-        return "🤖 **AI-Generated Response**"
+        # Fallback to OpenAI if Bedrock isn't available
+        return "🤖 **AI Response** (Powered by OpenAI GPT-4)"
 
 
 AI_DISCLAIMER = (
