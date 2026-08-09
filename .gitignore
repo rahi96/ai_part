@@ -42,7 +42,6 @@ analytics_store.json
 storage/
 
 # --- IDEs & Editors ---
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -75,3 +74,7 @@ python_installer.exe
 .python311/
 venv/
 .venv/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
